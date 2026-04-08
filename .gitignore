@@ -9,3 +9,29 @@ data/
 *.xlsx
 *.pdf
 *.csv
+# Analytiq — add these if not already present
+
+# Python env
+venv/
+.env
+*.env
+
+# User data — never commit
+data/
+
+# ML models
+*.joblib
+*.pkl
+
+# Generated reports
+*.pdf
+*.xlsx
+
+# Next.js
+.next/
+.env.local
+.env.production
+
+# OS
+.DS_Store
+Thumbs.db

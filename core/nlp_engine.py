@@ -9,8 +9,7 @@ from langchain_groq import ChatGroq
 
 load_dotenv()
 
-GROQ_KEY = os.getenv("GROQ_API_KEY") or "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"
-
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 
 def load_data_to_sqlite(csv_path: str, table_name: str = "data"):
     df     = pd.read_csv(csv_path)

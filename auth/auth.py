@@ -1,147 +1,154 @@
-# ============================================================
 # auth/auth.py
-# Analytiq — Login, Signup, Session Management
-# ============================================================
-
-import sqlite3
 import hashlib
 import os
-import streamlit as st
-from datetime import datetime
+from datetime import datetime, timezone
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from database.models import User, Client
+from database.connection import SessionLocal
 
-DB_PATH = "analytiq.db"
+DATA_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "data", "users")
+)
 
 
-def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-def init_db():
-    """Create users and sessions tables if they don't exist."""
-    conn = get_db()
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id        INTEGER PRIMARY KEY AUTOINCREMENT,
-            username  TEXT UNIQUE NOT NULL,
-            email     TEXT UNIQUE NOT NULL,
-            password  TEXT NOT NULL,
-            created   TEXT NOT NULL
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS clients (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id    INTEGER NOT NULL,
-            name       TEXT NOT NULL,
-            domain     TEXT,
-            created    TEXT NOT NULL,
-            FOREIGN KEY(user_id) REFERENCES users(id)
-        )
-    """)
-    conn.commit()
-    conn.close()
+def utcnow():
+    return datetime.now(timezone.utc)
 
 
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
 
-def signup(username: str, email: str, password: str) -> tuple[bool, str]:
-    """Register a new user. Returns (success, message)."""
+def _validate_signup(username: str, email: str, password: str):
+    username = username.strip()
+    email    = email.strip().lower()
+
     if len(username) < 3:
-        return False, "Username must be at least 3 characters."
+        return False, "Username must be at least 3 characters.", None, None
+    if len(username) > 30:
+        return False, "Username too long (max 30 characters).", None, None
+    if not all(c.isalnum() or c in "_-" for c in username):
+        return False, "Username can only contain letters, numbers, _ and -", None, None
     if len(password) < 6:
-        return False, "Password must be at least 6 characters."
-    if "@" not in email:
-        return False, "Enter a valid email address."
+        return False, "Password must be at least 6 characters.", None, None
+    if "@" not in email or "." not in email:
+        return False, "Enter a valid email address.", None, None
 
+    return True, "", username, email
+
+
+def signup(username: str, email: str, password: str) -> tuple[bool, str]:
+    valid, msg, username, email = _validate_signup(username, email, password)
+    if not valid:
+        return False, msg
+
+    db: Session = SessionLocal()
     try:
-        conn = get_db()
-        conn.execute(
-            "INSERT INTO users (username, email, password, created) VALUES (?, ?, ?, ?)",
-            (username.lower(), email.lower(), hash_password(password), datetime.now().isoformat())
-        )
-        conn.commit()
-        conn.close()
+        if db.query(User).filter(User.username.ilike(username)).first():
+            return False, "Username already taken. Please choose another."
+        if db.query(User).filter(User.email.ilike(email)).first():
+            return False, "An account with this email already exists. Try signing in."
 
-        # Create user data folder
-        os.makedirs(f"data/users/{username.lower()}", exist_ok=True)
-        return True, "Account created successfully!"
-    except sqlite3.IntegrityError:
+        user = User(
+            username = username.lower(),
+            email    = email,
+            password = hash_password(password),
+            created  = utcnow()
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        os.makedirs(os.path.join(DATA_DIR, str(user.id)), exist_ok=True)
+        return True, "Account created! You can now sign in."
+
+    except IntegrityError:
+        db.rollback()
         return False, "Username or email already exists."
+    except Exception as e:
+        db.rollback()
+        return False, f"Signup failed: {str(e)}"
+    finally:
+        db.close()
 
 
 def login(username: str, password: str) -> tuple[bool, str, dict]:
-    """Login user. Returns (success, message, user_data)."""
-    conn = get_db()
-    user = conn.execute(
-        "SELECT * FROM users WHERE username = ? AND password = ?",
-        (username.lower(), hash_password(password))
-    ).fetchone()
-    conn.close()
+    db: Session = SessionLocal()
+    try:
+        user = db.query(User).filter(
+            User.username.ilike(username.strip()),
+            User.password == hash_password(password)
+        ).first()
 
-    if user:
-        return True, "Login successful!", dict(user)
-    return False, "Invalid username or password.", {}
+        if user:
+            return True, "Login successful!", user.to_dict()
+        return False, "Incorrect username or password.", {}
+
+    except Exception as e:
+        return False, f"Login failed: {str(e)}", {}
+    finally:
+        db.close()
 
 
 def get_clients(user_id: int) -> list:
-    """Get all clients for a user."""
-    conn = get_db()
-    clients = conn.execute(
-        "SELECT * FROM clients WHERE user_id = ? ORDER BY created DESC",
-        (user_id,)
-    ).fetchall()
-    conn.close()
-    return [dict(c) for c in clients]
+    db: Session = SessionLocal()
+    try:
+        clients = db.query(Client).filter(
+            Client.user_id == user_id
+        ).order_by(Client.created.desc()).all()
+        return [c.to_dict() for c in clients]
+    except Exception:
+        return []
+    finally:
+        db.close()
 
 
 def add_client(user_id: int, name: str, domain: str) -> tuple[bool, str]:
-    """Add a new client workspace."""
+    name = name.strip()
     if len(name) < 2:
-        return False, "Client name too short."
-    try:
-        conn = get_db()
-        conn.execute(
-            "INSERT INTO clients (user_id, name, domain, created) VALUES (?, ?, ?, ?)",
-            (user_id, name, domain, datetime.now().isoformat())
-        )
-        conn.commit()
-        client_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-        conn.close()
+        return False, "Client name must be at least 2 characters."
+    if len(name) > 50:
+        return False, "Client name too long (max 50 characters)."
 
-        # Create client data folder
-        safe_name = name.lower().replace(" ", "_")
-        os.makedirs(f"data/users/{user_id}/{safe_name}", exist_ok=True)
+    db: Session = SessionLocal()
+    try:
+        client = Client(
+            user_id = user_id,
+            name    = name,
+            domain  = domain,
+            created = utcnow()
+        )
+        db.add(client)
+        db.commit()
+        db.refresh(client)
+
+        safe_name  = name.lower().replace(" ", "_")
+        client_dir = os.path.join(DATA_DIR, str(user_id), safe_name)
+        os.makedirs(client_dir, exist_ok=True)
         return True, f"Client '{name}' created."
+
     except Exception as e:
+        db.rollback()
         return False, str(e)
+    finally:
+        db.close()
 
 
 def delete_client(client_id: int, user_id: int) -> tuple[bool, str]:
-    """Delete a client and their data."""
+    db: Session = SessionLocal()
     try:
-        conn = get_db()
-        conn.execute(
-            "DELETE FROM clients WHERE id = ? AND user_id = ?",
-            (client_id, user_id)
-        )
-        conn.commit()
-        conn.close()
+        client = db.query(Client).filter(
+            Client.id == client_id,
+            Client.user_id == user_id
+        ).first()
+        if not client:
+            return False, "Client not found."
+        db.delete(client)
+        db.commit()
         return True, "Client deleted."
     except Exception as e:
+        db.rollback()
         return False, str(e)
-
-
-def require_login():
-    """
-    Call this at the top of every page.
-    Redirects to login if not authenticated.
-    Returns user dict if logged in.
-    """
-    if "user" not in st.session_state or not st.session_state.user:
-        st.error("Please log in to access this page.")
-        st.stop()
-    return st.session_state.user
+    finally:
+        db.close()

@@ -1,0 +1,79 @@
+# docker-compose.yml
+# Analytiq — Local production stack
+# Usage: docker-compose up
+
+version: "3.9"
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER:     analytiq
+      POSTGRES_PASSWORD: analytiq_dev_password
+      POSTGRES_DB:       analytiq
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U analytiq"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ───────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Backend ─────────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      ENV:              production
+      DATABASE_URL:     postgresql://analytiq:analytiq_dev_password@db:5432/analytiq
+      REDIS_URL:        redis://redis:6379/0
+      GROQ_API_KEY:     ${GROQ_API_KEY}
+      JWT_SECRET:       ${JWT_SECRET}
+      ALLOWED_ORIGINS:  http://localhost:3000
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data   # persist user data
+
+  # ── Celery worker ───────────────────────────────────────────
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    restart: always
+    command: celery -A workers.celery_app worker --loglevel=info -Q analytics,ml
+    environment:
+      ENV:          production
+      DATABASE_URL: postgresql://analytiq:analytiq_dev_password@db:5432/analytiq
+      REDIS_URL:    redis://redis:6379/0
+      GROQ_API_KEY: ${GROQ_API_KEY}
+    depends_on:
+      - backend
+      - redis
+
+volumes:
+  postgres_data:

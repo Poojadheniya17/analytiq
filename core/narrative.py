@@ -8,7 +8,7 @@ from langchain_groq import ChatGroq
 
 load_dotenv()
 
-GROQ_KEY = os.getenv("GROQ_API_KEY") or "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"
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 
 
 def generate_narrative(insights_path: str, metrics_path: str = None, client_name: str = "the client", domain: str = "business") -> str:
