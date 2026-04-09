@@ -106,3 +106,7 @@ def health():
 @app.get("/", tags=["System"])
 def root():
     return {"status": "Analytiq API running", "version": "2.0.0"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
