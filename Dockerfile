@@ -27,4 +27,4 @@ RUN mkdir -p /app/data/users
 EXPOSE 8000
 
 # Run database migration then start server
-CMD ["sh", "-c", "python database/migrate.py && uvicorn backend.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "python database/migrate.py && cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"]
