@@ -59,7 +59,7 @@ export default function InsightsPage() {
   const getChartUrl = (chart: string) => {
   if (!user || !client) return "";
   const safe = client.name.toLowerCase().replace(/ /g, "_");
-  return `http://localhost:8000/static/users/${user.id}/${safe}/charts/${chart}`;
+  return `${process.env.NEXT_PUBLIC_API_URL}/static/users/${user.id}/${safe}/charts/${chart}`;
 };
 
   const ins = status?.insights;

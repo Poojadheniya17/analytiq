@@ -29,7 +29,7 @@ export default function RecommendationsPage() {
   const fetchExisting = async (c: any) => {
     if (!user) return;
     try {
-      const res = await axios.get(`http://localhost:8000/api/ai/recommendations/${user.id}/${c.name}`);
+      axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/recommendations/${user.id}/${c.name}`)
       if (res.data.recommendations) setRecs(res.data.recommendations);
     } catch {}
   };
@@ -38,7 +38,7 @@ export default function RecommendationsPage() {
     if (!client || !user) return;
     setGenerating(true); setError("");
     try {
-      const res = await axios.post("http://localhost:8000/api/ai/recommendations", {
+      axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/recommendations`, {
         user_id: user.id, client_name: client.name, domain: client.domain
       });
       setRecs(res.data.recommendations);

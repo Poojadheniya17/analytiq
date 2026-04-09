@@ -30,7 +30,7 @@ export default function UploadPage() {
     if (!user) return;
     setLoadingQuality(true);
     try {
-      const res = await axios.get(`http://localhost:8000/api/clients/${user.id}/${clientName}/quality`);
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/clients/${user.id}/${clientName}/quality`);
       setQuality(res.data);
     } catch {}
     finally { setLoadingQuality(false); }
