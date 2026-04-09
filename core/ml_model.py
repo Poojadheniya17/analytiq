@@ -342,7 +342,7 @@ def run_automl(X_train, X_test, y_train, y_test, X_full, y_full,
         candidates = {
             "XGBoost":             XGBClassifier(n_estimators=300, eval_metric="mlogloss", random_state=42, n_jobs=-1),
             "Random Forest":       RandomForestClassifier(n_estimators=200, class_weight=cw, random_state=42, n_jobs=-1),
-            "Logistic Regression": LogisticRegression(max_iter=1000, class_weight=cw, random_state=42, multi_class="auto"),
+            "Logistic Regression": LogisticRegression(max_iter=5000, solver="saga", class_weight=cw, random_state=42, multi_class="auto"),
         }
         if LGBM_AVAILABLE:
             candidates["LightGBM"] = LGBMClassifier(
