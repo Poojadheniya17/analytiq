@@ -19,7 +19,7 @@ def load_data_to_sqlite(csv_path: str, table_name: str = "data"):
 
 
 def english_to_sql(question: str, schema: str) -> str:
-    llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0, api_key=GROQ_KEY)
+    llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0, api_key=os.environ.get("GROQ_API_KEY", ""))
     prompt = f"""You are an expert SQL analyst. Convert the question to a valid SQLite query.
 
 Schema:
@@ -43,7 +43,7 @@ SQL:"""
 
 
 def results_to_english(question: str, sql: str, results: pd.DataFrame) -> str:
-    llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.3, api_key=GROQ_KEY)
+    llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.3, api_key=os.environ.get("GROQ_API_KEY", ""))
     results_str = results.to_string(index=False) if len(results) <= 20 else results.head(20).to_string(index=False)
     prompt = f"""You are a business analyst presenting findings to a non-technical executive.
 
@@ -69,3 +69,4 @@ def query(question: str, csv_path: str) -> dict:
         return {"question": question, "sql": sql, "results": results, "answer": answer, "error": None}
     except Exception as e:
         return {"question": question, "sql": sql, "results": None, "answer": None, "error": str(e)}
+

@@ -110,7 +110,7 @@ def get_recommendations(req: NarrativeRequest):
     for seg in segments[:3]:
         seg_text += f"\n- {seg['segment']}: highest risk in '{seg['highest_churn_value']}' at {seg['highest_churn_rate_%']}%"
 
-    llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.3, api_key=GROQ_KEY)
+    llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.3, api_key=os.environ.get("GROQ_API_KEY", ""))
 
     prompt = f"""You are a senior data analytics consultant at Bold Analytics.
 

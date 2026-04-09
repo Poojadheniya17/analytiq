@@ -74,8 +74,9 @@ Do NOT use bullet points — write in flowing paragraphs like a consulting repor
     llm = ChatGroq(
         model="llama-3.3-70b-versatile",
         temperature=0.4,
-        api_key=GROQ_KEY
+        api_key=os.environ.get("GROQ_API_KEY", "")
     )
 
     response = llm.invoke(prompt)
     return response.content.strip()
+
