@@ -29,8 +29,9 @@ export default function RecommendationsPage() {
   const fetchExisting = async (c: any) => {
     if (!user) return;
     try {
-      axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/recommendations/${user.id}/${c.name}`)
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/recommendations/${user.id}/${c.name}`);
       if (res.data.recommendations) setRecs(res.data.recommendations);
+
     } catch {}
   };
 
