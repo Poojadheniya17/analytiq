@@ -39,7 +39,7 @@ export default function RecommendationsPage() {
     if (!client || !user) return;
     setGenerating(true); setError("");
     try {
-      axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/recommendations`, {
+      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/ai/recommendations`, {
         user_id: user.id, client_name: client.name, domain: client.domain
       });
       setRecs(res.data.recommendations);
@@ -130,3 +130,4 @@ export default function RecommendationsPage() {
   );
 }
  
+
