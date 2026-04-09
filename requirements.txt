@@ -1,5 +1,6 @@
 # requirements.txt — Analytiq complete dependencies
-
+matplotlib==3.8.4
+seaborn==0.13.2
 # Web framework
 fastapi==0.111.0
 uvicorn[standard]==0.29.0
