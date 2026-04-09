@@ -1,6 +1,7 @@
 # auth/auth.py
-import hashlib
 import os
+import bcrypt
+import hashlib
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -17,7 +18,25 @@ def utcnow():
 
 
 def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
+    """Hash password using bcrypt."""
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+
+def verify_password(password: str, hashed: str) -> bool:
+    """
+    Verify password against stored hash.
+    Supports both bcrypt (new) and SHA-256 (legacy) hashes.
+    """
+    # Try bcrypt first
+    try:
+        return bcrypt.checkpw(password.encode(), hashed.encode())
+    except Exception:
+        pass
+    # Fallback: SHA-256 for existing accounts
+    try:
+        return hashlib.sha256(password.encode()).hexdigest() == hashed
+    except Exception:
+        return False
 
 
 def _validate_signup(username: str, email: str, password: str):
@@ -47,6 +66,7 @@ def signup(username: str, email: str, password: str) -> tuple[bool, str]:
     try:
         if db.query(User).filter(User.username.ilike(username)).first():
             return False, "Username already taken. Please choose another."
+
         if db.query(User).filter(User.email.ilike(email)).first():
             return False, "An account with this email already exists. Try signing in."
 
@@ -77,11 +97,10 @@ def login(username: str, password: str) -> tuple[bool, str, dict]:
     db: Session = SessionLocal()
     try:
         user = db.query(User).filter(
-            User.username.ilike(username.strip()),
-            User.password == hash_password(password)
+            User.username.ilike(username.strip())
         ).first()
 
-        if user:
+        if user and verify_password(password, user.password):
             return True, "Login successful!", user.to_dict()
         return False, "Incorrect username or password.", {}
 
